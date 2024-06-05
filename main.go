@@ -60,41 +60,18 @@ func getCommands() map[string]cliCommand {
 // Prints the next 20 locations
 func commandMap(c *config) error {
 	if c.Next == "" {
-		fmt.Println("\n No more locations to display")
+		fmt.Println("\nNo more locations to display")
 		return nil
 	}
 
-	res, err := http.Get(c.Next)
+	pokemonLocales, err := fetchAndPrintLocations(c.Next)
 	if err != nil {
-		fmt.Printf("Failed to fetch locations: %v\n", err)
-	}
-	defer res.Body.Close()
-
-	body, err := io.ReadAll(res.Body)
-	if err != nil {
-		fmt.Printf("Failed to read response body: %v\n", err)
+		fmt.Println(err)
 		return err
-	}
-
-	if res.StatusCode > 299 {
-		fmt.Printf("Response failed with status code: %d, and \n body: %s\n", res.StatusCode, body)
-		return fmt.Errorf("bad status code: %d", res.StatusCode)
-	}
-
-	var pokemonLocales PokemonLocales
-	err = json.Unmarshal(body, &pokemonLocales) // parse body into locales struct
-	if err != nil {
-		fmt.Printf("Failed to parse JSON: %v\n", err)
-		return err
-	}
-
-	for _, locale := range pokemonLocales.Results {
-		fmt.Println(locale.Name)
 	}
 
 	c.Previous = c.Next
 	c.Next = pokemonLocales.Next
-
 	return nil
 }
 
@@ -105,33 +82,10 @@ func commandMapBack(c *config) error {
 		return nil
 	}
 
-	res, err := http.Get(c.Previous)
+	pokemonLocales, err := fetchAndPrintLocations(c.Previous)
 	if err != nil {
-		fmt.Printf("Failed to fetch locations: %v\n", err)
+		fmt.Println(err)
 		return err
-	}
-	defer res.Body.Close()
-
-	body, err := io.ReadAll(res.Body)
-	if err != nil {
-		fmt.Printf("Failed to read response body: %v\n", err)
-		return err
-	}
-
-	if res.StatusCode > 299 {
-		fmt.Printf("Response failed with status code: %d, and \n body: %s\n", res.StatusCode, body)
-		return fmt.Errorf("bad status code: %d", res.StatusCode)
-	}
-
-	var pokemonLocales PokemonLocales
-	err = json.Unmarshal(body, &pokemonLocales) // parse body into locales struct
-	if err != nil {
-		fmt.Printf("Failed to parse JSON: %v\n", err)
-		return err
-	}
-
-	for _, locale := range pokemonLocales.Results {
-		fmt.Println(locale.Name)
 	}
 
 	c.Next = pokemonLocales.Next
@@ -143,6 +97,35 @@ func commandMapBack(c *config) error {
 	}
 
 	return nil
+}
+
+func fetchAndPrintLocations(url string) (PokemonLocales, error) {
+	res, err := http.Get(url)
+	if err != nil {
+		return PokemonLocales{}, fmt.Errorf("failed to fetch locations: %v", err)
+	}
+	defer res.Body.Close()
+
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		return PokemonLocales{}, fmt.Errorf("failed to read response body: %v", err)
+	}
+
+	if res.StatusCode > 299 {
+		return PokemonLocales{}, fmt.Errorf("response failed with status code: %d, and body: %s", res.StatusCode, body)
+	}
+
+	var pokemonLocales PokemonLocales
+	err = json.Unmarshal(body, &pokemonLocales)
+	if err != nil {
+		return PokemonLocales{}, fmt.Errorf("failed to parse JSON: %v", err)
+	}
+
+	for _, locale := range pokemonLocales.Results {
+		fmt.Println(locale.Name)
+	}
+
+	return pokemonLocales, nil
 }
 
 // Trims whitespace and converts input to lowercase
