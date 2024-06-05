@@ -82,7 +82,7 @@ func commandMap(c *config) error {
 	}
 
 	var pokemonLocales PokemonLocales
-	err = json.Unmarshal(body, &pokemonLocales)
+	err = json.Unmarshal(body, &pokemonLocales) // parse body into locales struct
 	if err != nil {
 		fmt.Printf("Failed to parse JSON: %v\n", err)
 		return err
@@ -124,7 +124,7 @@ func commandMapBack(c *config) error {
 	}
 
 	var pokemonLocales PokemonLocales
-	err = json.Unmarshal(body, &pokemonLocales)
+	err = json.Unmarshal(body, &pokemonLocales) // parse body into locales struct
 	if err != nil {
 		fmt.Printf("Failed to parse JSON: %v\n", err)
 		return err
