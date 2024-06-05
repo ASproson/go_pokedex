@@ -60,7 +60,7 @@ func main() {
 		}
 
 		// Remove white spaces
-		command := strings.TrimSpace(input)
+		command := strings.ToLower(strings.TrimSpace(input))
 
 		// Check if command exists in map
 		if cmd, exists := commands[command]; exists {
