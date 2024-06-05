@@ -13,28 +13,9 @@ type cliCommand struct {
 	callback    func() error
 }
 
-func commandHelp() error {
-	fmt.Println()
-	fmt.Println("Welcome to the Pokédex!")
-	fmt.Println("Available commands:")
-	fmt.Println()
-	fmt.Println("	help: Displays a help message")
-	fmt.Println("	exit: Exit the Pokédex")
-	fmt.Println()
-	return nil
-}
-
-func commandExit() error {
-	fmt.Println()
-	fmt.Println("Exiting Pokédex...")
-	fmt.Println()
-	os.Exit(0)
-	return nil
-}
-
-func main() {
-
-	commands := map[string]cliCommand{
+// Returns a map of available commands
+func getCommands() map[string]cliCommand {
+	return map[string]cliCommand{
 		"help": {
 			name:        "help",
 			description: "Displays a help message",
@@ -42,40 +23,68 @@ func main() {
 		},
 		"exit": {
 			name:        "exit",
-			description: "Exits the Pokédex",
+			description: "Exits the Pokedex",
 			callback:    commandExit,
 		},
 	}
+}
+
+// Trims whitespace and converts input to lowercase
+func cleanInput(text string) string {
+	return strings.ToLower(strings.TrimSpace(text))
+}
+
+// Prints a help message listing all available commands
+func commandHelp() error {
+	fmt.Println("\nWelcome to the Pokédex!")
+	fmt.Println("Available commands:")
+
+	commands := getCommands()
+	for _, value := range commands {
+		fmt.Printf("%s: %s\n", value.name, value.description)
+	}
+	fmt.Println()
+	return nil
+}
+
+// Exit the application
+func commandExit() error {
+	fmt.Println("\nExiting Pokédex...")
+	os.Exit(0)
+	return nil
+}
+
+func main() {
+	commands := getCommands()
+	// Collect user input
+	scanner := bufio.NewScanner(os.Stdin)
 
 	// REPL loop
 	for {
-		reader := bufio.NewReader(os.Stdin)
 		fmt.Print("Pokédex > ")
-
 		// Read user input
-		input, err := reader.ReadString('\n')
-		if err != nil {
-			fmt.Println("Error reading input:", err)
-			continue
+		if !scanner.Scan() {
+			fmt.Println("Error reading input or end of input detected")
+			break
 		}
+		input := scanner.Text()
 
-		// Remove white spaces
+		// Clean and process input
 		command := cleanInput(input)
 
 		// Check if command exists in map
 		if cmd, exists := commands[command]; exists {
-			// Execute command
+			// Execute the command's callback function
 			if err := cmd.callback(); err != nil {
 				fmt.Println("Error executing command:", err)
 			}
 		} else {
-			fmt.Println()
 			fmt.Println("Unknown command:", command)
-			fmt.Println()
 		}
 	}
-}
 
-func cleanInput(text string) string {
-	return strings.ToLower(strings.TrimSpace(text))
+	// Check for scanner errors
+	if err := scanner.Err(); err != nil {
+		fmt.Println("Error with input:", err)
+	}
 }
