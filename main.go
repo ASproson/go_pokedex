@@ -27,6 +27,7 @@ func commandHelp() error {
 func commandExit() error {
 	fmt.Println()
 	fmt.Println("Exiting Pokédex...")
+	fmt.Println()
 	os.Exit(0)
 	return nil
 }
