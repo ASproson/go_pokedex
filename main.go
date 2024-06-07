@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"os"
 	"strings"
+
+	"github.com/asproson/go_pokedex/internal/pokecache"
 )
 
 type cliCommand struct {
@@ -158,6 +160,8 @@ func main() {
 	conf := &config{
 		Next: "https://pokeapi.co/api/v2/location?offset=0&limit=20",
 	}
+
+	pokecache.NewCache(5)
 
 	commands := getCommands()
 	// Collect user input
