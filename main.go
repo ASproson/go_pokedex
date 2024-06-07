@@ -20,8 +20,9 @@ type cliCommand struct {
 }
 
 type config struct {
-	Previous string
-	Next     string
+	Previous   string
+	Next       string
+	CurrentArg string
 }
 
 type PokemonLocales struct {
@@ -32,6 +33,14 @@ type PokemonLocales struct {
 		Name string `json:"name"`
 		URL  string `json:"url"`
 	} `json:"results"`
+}
+
+type LocationAreaResponse struct {
+	PokemonEncounters []struct {
+		Pokemon struct {
+			Name string `json:"name"`
+		} `json:"pokemon"`
+	} `json:"pokemon_encounters"`
 }
 
 // Returns a map of available commands
@@ -57,7 +66,62 @@ func getCommands() map[string]cliCommand {
 			description: "Shows the previous 20 locations in the Pokémon world, each subsequent call shows the previous 20",
 			callback:    commandMapBack,
 		},
+		"explore": {
+			name:        "explore",
+			description: "Shows all available Pokémon on the passed route",
+			callback:    commandExplore,
+		},
 	}
+}
+
+func commandExplore(c *config, cache *pokecache.Cache) error {
+	locationName := c.CurrentArg
+
+	if locationName == "" {
+		fmt.Println("Location area name is required for explore command")
+		return nil
+	}
+
+	url := fmt.Sprintf("https://pokeapi.co/api/v2/location-area/%s/", locationName)
+
+	// Check if locale detail is in cache
+	if val, found := cache.Get(url); found {
+		fmt.Println(">>>>> Using cached data <<<<<")
+		return printPokemonNames(val)
+	}
+
+	res, err := http.Get(url)
+
+	if err != nil {
+		return fmt.Errorf("failed to fetch location: %v", locationName)
+	}
+
+	defer res.Body.Close()
+
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		return fmt.Errorf("failed to read resposne body: %v", err)
+	}
+
+	// Add response to the cache
+	cache.Add(url, body)
+
+	return printPokemonNames(body)
+}
+
+func printPokemonNames(body []byte) error {
+	var data LocationAreaResponse
+
+	if err := json.Unmarshal(body, &data); err != nil {
+		return fmt.Errorf("failed to unmarshal response body: %v", err)
+	}
+
+	fmt.Println("Found Pokémon:")
+	for _, encounter := range data.PokemonEncounters {
+		fmt.Printf(" - %s\n", encounter.Pokemon.Name)
+	}
+
+	return nil
 }
 
 // Prints the next 20 locations
@@ -192,12 +256,24 @@ func main() {
 			break
 		}
 		input := scanner.Text()
+		cleanedInput := cleanInput(input)
+
+		parts := strings.Fields(cleanedInput)
+		if len(parts) == 0 {
+			continue // skip empty input
+		}
 
 		// Clean and process input
-		command := cleanInput(input)
+		command := parts[0]
+
+		var arg string
+		if len(parts) > 1 {
+			arg = parts[1]
+		}
 
 		// Check if command exists in map
 		if cmd, exists := commands[command]; exists {
+			conf.CurrentArg = arg
 			// Execute the command's callback function
 			if err := cmd.callback(conf, cache); err != nil {
 				fmt.Println("Error executing command:", err)
