@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math/rand"
 	"net/http"
 	"os"
 	"strings"
@@ -23,6 +24,7 @@ type config struct {
 	Previous   string
 	Next       string
 	CurrentArg string
+	Pokedex    *Pokedex
 }
 
 type PokemonLocales struct {
@@ -41,6 +43,15 @@ type LocationAreaResponse struct {
 			Name string `json:"name"`
 		} `json:"pokemon"`
 	} `json:"pokemon_encounters"`
+}
+
+type Pokedex struct {
+	Pokemon map[string]Pokemon
+}
+
+type Pokemon struct {
+	Name           string `json:"name"`
+	BaseExperience int    `json:"base_experience"`
 }
 
 // Returns a map of available commands
@@ -71,7 +82,53 @@ func getCommands() map[string]cliCommand {
 			description: "Shows all available Pokémon on the passed route",
 			callback:    commandExplore,
 		},
+		"catch": {
+			name:        "catch",
+			description: "Attempt to catch the named Pokémon",
+			callback:    commandCatch,
+		},
 	}
+}
+
+func commandCatch(c *config, cache *pokecache.Cache) error {
+	pokemonToCatch := c.CurrentArg
+
+	if pokemonToCatch == "" {
+		fmt.Println("Pokémon name is required to catch")
+	}
+
+	url := fmt.Sprintf("https://pokeapi.co/api/v2/pokemon/%s/", pokemonToCatch)
+
+	res, err := http.Get(url)
+	if err != nil {
+		return fmt.Errorf("failed to fetch Pokémon: %v", err)
+	}
+	defer res.Body.Close()
+
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		return fmt.Errorf("failed to read response body: %v", err)
+	}
+
+	// Decode JSON response into Pokemon struct
+	var fetchedPokemon Pokemon
+	if err := json.Unmarshal(body, &fetchedPokemon); err != nil {
+		return fmt.Errorf("failed to unmarshal response body: %v", err)
+	}
+
+	// The higher the base experience, the harder it is to catch
+	catchChance := rand.Intn(100) // Random number between 0-99
+
+	if catchChance < 50 {
+		fmt.Printf("%s was caught!\n", fetchedPokemon.Name)
+		pokedex := Pokedex{Pokemon: map[string]Pokemon{}}
+		pokedex.Pokemon[pokemonToCatch] = fetchedPokemon
+	} else {
+		fmt.Printf("%s escaped!\n", fetchedPokemon.Name)
+	}
+
+	return nil
+
 }
 
 func commandExplore(c *config, cache *pokecache.Cache) error {
@@ -240,7 +297,8 @@ func main() {
 
 	// Initialize config with inital url
 	conf := &config{
-		Next: "https://pokeapi.co/api/v2/location?offset=0&limit=20",
+		Next:    "https://pokeapi.co/api/v2/location?offset=0&limit=20",
+		Pokedex: &Pokedex{Pokemon: make(map[string]Pokemon)},
 	}
 
 	commands := getCommands()
