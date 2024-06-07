@@ -129,8 +129,7 @@ func commandCatch(c *config, cache *pokecache.Cache) error {
 
 	if catchChance < 50 {
 		fmt.Printf("%s was caught!\n", fetchedPokemon.Name)
-		pokedex := Pokedex{Pokemon: map[string]Pokemon{}}
-		pokedex.Pokemon[pokemonToCatch] = fetchedPokemon
+		c.Pokedex.Pokemon[pokemonToCatch] = fetchedPokemon
 	} else {
 		fmt.Printf("%s escaped!\n", fetchedPokemon.Name)
 	}
