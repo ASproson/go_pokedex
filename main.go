@@ -50,8 +50,25 @@ type Pokedex struct {
 }
 
 type Pokemon struct {
-	Name           string `json:"name"`
-	BaseExperience int    `json:"base_experience"`
+	Name           string         `json:"name"`
+	BaseExperience int            `json:"base_experience"`
+	Height         int            `json:"height"`
+	Weight         int            `json:"weight"`
+	Stats          []PokemonStats `json:"stats"`
+	Types          []PokemonTypes `json:"types"`
+}
+
+type PokemonStats struct {
+	Stat struct {
+		Name string `json:"name"`
+	} `json:"stat"`
+	BaseStat int `json:"base_stat"`
+}
+
+type PokemonTypes struct {
+	Type struct {
+		Name string `json:"name"`
+	} `json:"type"`
 }
 
 // Returns a map of available commands
@@ -87,7 +104,62 @@ func getCommands() map[string]cliCommand {
 			description: "Attempt to catch the named Pokémon",
 			callback:    commandCatch,
 		},
+		"inspect": {
+			name:        "inspect",
+			description: "Use the Pokédex to inspect your caught Pokémon",
+			callback:    commandInspect,
+		},
+		"pokedex": {
+			name:        "pokedex",
+			description: "Use the Pokédex to see all the Pokémon you have caught",
+			callback:    commandPokedex,
+		},
 	}
+}
+
+func commandPokedex(c *config, cache *pokecache.Cache) error {
+	if len(c.Pokedex.Pokemon) == 0 {
+		fmt.Println("No Pokémon have been caught")
+		return nil
+	}
+
+	fmt.Println("Your Pokédex:")
+
+	for _, pokemon := range c.Pokedex.Pokemon {
+		fmt.Printf("- %s\n", pokemon.Name)
+	}
+	return nil
+}
+
+func commandInspect(c *config, cache *pokecache.Cache) error {
+	pokemonName := c.CurrentArg
+
+	if pokemonName == "" {
+		fmt.Println("Pokémon name is required to inspect")
+		return nil
+	}
+
+	// Check if Pokémon is in Pokédex
+	pokemon, exists := c.Pokedex.Pokemon[pokemonName]
+	if !exists {
+		fmt.Printf("You have not yet caught %s\n", pokemonName)
+		return nil
+	}
+
+	// Pokémon exists, print details
+	fmt.Printf("Name: %s\n", pokemon.Name)
+	fmt.Printf("Height: %d\n", pokemon.Height)
+	fmt.Printf("Weight: %d\n", pokemon.Weight)
+	fmt.Println("Stats:")
+	for _, stat := range pokemon.Stats {
+		fmt.Printf("  - %s: %d\n", stat.Stat.Name, stat.BaseStat)
+	}
+	fmt.Println("Types:")
+	for _, pokemonType := range pokemon.Types {
+		fmt.Printf("  - %s\n", pokemonType.Type.Name)
+	}
+
+	return nil
 }
 
 func commandCatch(c *config, cache *pokecache.Cache) error {
