@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/asproson/go_pokedex/internal/pokecache"
 )
@@ -15,7 +16,7 @@ import (
 type cliCommand struct {
 	name        string
 	description string
-	callback    func(*config) error
+	callback    func(*config, *pokecache.Cache) error
 }
 
 type config struct {
@@ -60,74 +61,88 @@ func getCommands() map[string]cliCommand {
 }
 
 // Prints the next 20 locations
-func commandMap(c *config) error {
+func commandMap(c *config, cache *pokecache.Cache) error {
 	if c.Next == "" {
 		fmt.Println("\nNo more locations to display")
 		return nil
 	}
 
-	pokemonLocales, err := fetchAndPrintLocations(c.Next)
+	err := fetchAndPrintLocations(c, cache)
 	if err != nil {
 		fmt.Println(err)
 		return err
 	}
 
-	c.Previous = c.Next
-	c.Next = pokemonLocales.Next
 	return nil
 }
 
 // Prints the previous 20 locations, errors when used on first page
-func commandMapBack(c *config) error {
+func commandMapBack(c *config, cache *pokecache.Cache) error {
 	if c.Previous == "" {
 		fmt.Println("\nNo previous locations to display")
 		return nil
 	}
 
-	pokemonLocales, err := fetchAndPrintLocations(c.Previous)
+	// Swap c.Next and c.Previous before fetching the locations
+	c.Next, c.Previous = c.Previous, c.Next
+
+	err := fetchAndPrintLocations(c, cache)
 	if err != nil {
 		fmt.Println(err)
 		return err
 	}
 
-	c.Next = pokemonLocales.Next
-
-	if pokemonLocales.Previous == nil {
-		c.Previous = ""
-	} else {
-		c.Previous = pokemonLocales.Previous.(string)
-	}
-
 	return nil
 }
 
-func fetchAndPrintLocations(url string) (PokemonLocales, error) {
+func fetchAndPrintLocations(c *config, cache *pokecache.Cache) error {
+	url := c.Next
+
+	// Check if the response for this URL is in the cache
+	if val, found := cache.Get(url); found {
+		// fmt.Println("Using cached data")
+		return updateConfigAndPrintLocations(c, val)
+	}
+
+	// Make the network request since it's not in the cache
 	res, err := http.Get(url)
 	if err != nil {
-		return PokemonLocales{}, fmt.Errorf("failed to fetch locations: %v", err)
+		return fmt.Errorf("failed to fetch locations: %v", err)
 	}
 	defer res.Body.Close()
 
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
-		return PokemonLocales{}, fmt.Errorf("failed to read response body: %v", err)
+		return fmt.Errorf("failed to read response body: %v", err)
 	}
 
-	if res.StatusCode > 299 {
-		return PokemonLocales{}, fmt.Errorf("response failed with status code: %d, and body: %s", res.StatusCode, body)
+	// Add the response to the cache
+	cache.Add(url, body)
+
+	// Print the locations and update the config
+	return updateConfigAndPrintLocations(c, body)
+}
+
+func updateConfigAndPrintLocations(c *config, body []byte) error {
+	var data PokemonLocales
+
+	// Unmarshal the response body
+	if err := json.Unmarshal(body, &data); err != nil {
+		return fmt.Errorf("failed to unmarshal response body: %v", err)
 	}
 
-	var pokemonLocales PokemonLocales
-	err = json.Unmarshal(body, &pokemonLocales)
-	if err != nil {
-		return PokemonLocales{}, fmt.Errorf("failed to parse JSON: %v", err)
+	for _, result := range data.Results {
+		fmt.Println(result.Name)
 	}
 
-	for _, locale := range pokemonLocales.Results {
-		fmt.Println(locale.Name)
+	c.Next = data.Next
+	if data.Previous == nil {
+		c.Previous = ""
+	} else {
+		c.Previous = data.Previous.(string)
 	}
 
-	return pokemonLocales, nil
+	return nil
 }
 
 // Trims whitespace and converts input to lowercase
@@ -136,7 +151,7 @@ func cleanInput(text string) string {
 }
 
 // Prints a help message listing all available commands
-func commandHelp(c *config) error {
+func commandHelp(c *config, cache *pokecache.Cache) error {
 	fmt.Println("\nWelcome to the Pokédex!")
 	fmt.Println("Available commands:")
 
@@ -149,19 +164,20 @@ func commandHelp(c *config) error {
 }
 
 // Exit the application
-func commandExit(c *config) error {
+func commandExit(c *config, cache *pokecache.Cache) error {
 	fmt.Println("\nExiting Pokédex...")
 	os.Exit(0)
 	return nil
 }
 
 func main() {
+	// Initial cache with cleanup interval of 5 minutes
+	cache := pokecache.NewCache(5 * time.Minute)
+
 	// Initialize config with inital url
 	conf := &config{
 		Next: "https://pokeapi.co/api/v2/location?offset=0&limit=20",
 	}
-
-	pokecache.NewCache(5)
 
 	commands := getCommands()
 	// Collect user input
@@ -183,7 +199,7 @@ func main() {
 		// Check if command exists in map
 		if cmd, exists := commands[command]; exists {
 			// Execute the command's callback function
-			if err := cmd.callback(conf); err != nil {
+			if err := cmd.callback(conf, cache); err != nil {
 				fmt.Println("Error executing command:", err)
 			}
 		} else {
