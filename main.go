@@ -100,7 +100,7 @@ func fetchAndPrintLocations(c *config, cache *pokecache.Cache) error {
 
 	// Check if the response for this URL is in the cache
 	if val, found := cache.Get(url); found {
-		// fmt.Println("Using cached data")
+		fmt.Println(">>>>> Using cached data <<<<<")
 		return updateConfigAndPrintLocations(c, val)
 	}
 
