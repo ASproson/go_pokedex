@@ -116,6 +116,14 @@ func commandCatch(c *config, cache *pokecache.Cache) error {
 		return fmt.Errorf("failed to unmarshal response body: %v", err)
 	}
 
+	fmt.Printf("...%s was found! Throwing Pokéball!\n", fetchedPokemon.Name)
+
+	// Simulate catching experience
+	for i := 0; i < 3; i++ {
+		time.Sleep(500 * time.Millisecond)
+		fmt.Println("...")
+	}
+
 	// The higher the base experience, the harder it is to catch
 	catchChance := rand.Intn(100) // Random number between 0-99
 
