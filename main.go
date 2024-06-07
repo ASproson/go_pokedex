@@ -95,6 +95,7 @@ func commandCatch(c *config, cache *pokecache.Cache) error {
 
 	if pokemonToCatch == "" {
 		fmt.Println("Pokémon name is required to catch")
+		return nil
 	}
 
 	url := fmt.Sprintf("https://pokeapi.co/api/v2/pokemon/%s/", pokemonToCatch)
